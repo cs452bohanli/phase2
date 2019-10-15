@@ -90,7 +90,7 @@ IllegalHandler(int type, void *arg)
 static void 
 SyscallHandler(int type, void *arg) 
 {
-    USLOSS_Sysargs args = (USLOSS_Sysargs *) args;
+    USLOSS_Sysargs *args = (USLOSS_Sysargs *) arg;
     // not sure if right way to handle errors
     if (!isValidSys(args -> number)) USLOSS_IllegalInstruction();
     handlers[args -> number](args);
