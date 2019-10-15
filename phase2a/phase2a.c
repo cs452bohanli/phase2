@@ -191,6 +191,7 @@ int
 P2_Wait(int *pid, int *status) 
 {
     checkIfIsKernel();
+    USLOSS_Console("inside %d\n", P1_GetPid());
     int currentUserProcess = getUserProcess(P1_GetPid());
     assert(currentUserProcess != -1);
     int rc = P1_Join(TAG_USER, pid, status);
