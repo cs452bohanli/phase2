@@ -275,7 +275,7 @@ void terminateStub(USLOSS_Sysargs *sysargs) {
 void getProcInfoStub(USLOSS_Sysargs *sysargs) {
 	checkIfIsKernel();
 	int rc;
-	int pid = sysargs->arg1;
+	int pid = (int) sysargs->arg1;
 	P1_ProcInfo *info = sysargs->arg2;
 	rc = P1_GetProcInfo(pid, info);
 	sysargs->arg4 = (void*) rc;
@@ -283,14 +283,15 @@ void getProcInfoStub(USLOSS_Sysargs *sysargs) {
 
 void getPidStub(USLOSS_Sysargs *sysargs) {
 	checkIfIsKernel();
-	int pid = P1_GetPID();
+	int pid = P1_GetPid();
 	sysargs->arg1 = (void*) pid;
 }
 
 void getTimeOfDayStub(USLOSS_Sysargs *sysargs){
 	checkIfIsKernel();
-	int rc = USLOSS_Clock;
-	sysargs->arg1 = (void*) rc;
+	int status;
+	int rc = USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, &status);
+	sysargs->arg1 = (void*) status;
 }
 
 /*

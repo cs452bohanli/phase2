@@ -57,7 +57,7 @@ LIBS = -lusloss$(USLOSS_VERSION) \
 	   -l$(PHASE)-$(VERSION) 
 
 # Change this if you want change which flags are passed to the C compiler.
-CFLAGS += -Wall -g -std=gnu99 -Werror
+CFLAGS += -Wall -g -std=gnu99
 #CFLAGS += -DDEBUG
 
 # You shouldn't need to change anything below here. 
