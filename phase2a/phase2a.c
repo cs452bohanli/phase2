@@ -33,6 +33,9 @@ int isValidSys(unsigned int number);
 static void SpawnStub(USLOSS_Sysargs *sysargs);
 void waitStub(USLOSS_Sysargs *sysargs);
 void terminateStub(USLOSS_Sysargs *sysargs);
+void getProcInfoStub(USLOSS_Sysargs*);
+void getPidStub(USLOSS_Sysargs*);
+void getTimeOfDayStub(USLOSS_Sysargs);
 
 /*
     Returns the pid of the user process given by the kernel pid, -1 if not found.
@@ -123,6 +126,12 @@ P2ProcInit(void)
     rc = P2_SetSyscallHandler(SYS_WAIT, waitStub);
     assert(rc == P1_SUCCESS);
     rc = P2_SetSyscallHandler(SYS_TERMINATE, terminateStub);
+    assert(rc == P1_SUCCESS);
+    rc = P2_SetSyscallHandler(SYS_GETPROCINFO, getProcInfoStub);
+    assert(rc == P1_SUCCESS);
+    rc = P2_SetSyscallHandler(SYS_GETPID, getPidStub);
+    assert(rc == P1_SUCCESS);
+    rc = P2_SetSyscallHandler(SYS_GETTIMEOFDAY, getTimeOfDayStub);
     assert(rc == P1_SUCCESS);
 }
 
@@ -258,6 +267,18 @@ void waitStub(USLOSS_Sysargs *sysargs) {
 void terminateStub(USLOSS_Sysargs *sysargs) {
     checkIfIsKernel();
     P2_Terminate((int) sysargs -> arg1);
+}
+
+void getProcInfoStub(USLOSS_Sysargs *sysargs) {
+    USLOSS_Console("procinfo not implemented\n");
+}
+
+void getPidStub(USLOSS_Sysargs *sysargs) {
+    USLOSS_Console("getpid not implemented\n");
+}
+
+void getTimeOfDayStub(USLOSS_Sysargs *sysargs){
+    USLOSS_Console("gettimeofday not implemented\n");
 }
 
 /*
