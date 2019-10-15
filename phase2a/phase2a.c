@@ -35,7 +35,7 @@ void waitStub(USLOSS_Sysargs *sysargs);
 void terminateStub(USLOSS_Sysargs *sysargs);
 void getProcInfoStub(USLOSS_Sysargs*);
 void getPidStub(USLOSS_Sysargs*);
-void getTimeOfDayStub(USLOSS_Sysargs);
+void getTimeOfDayStub(USLOSS_Sysargs*);
 
 /*
     Returns the pid of the user process given by the kernel pid, -1 if not found.
