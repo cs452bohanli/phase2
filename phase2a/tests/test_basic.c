@@ -49,7 +49,6 @@ int P2_Startup(void *arg)
     P2ProcInit();
     p2Pid = P1_GetPid();
     rc = P2_Spawn("P3_Startup", P3_Startup, NULL, 4*USLOSS_MIN_STACK, 3, &p3Pid);
-    USLOSS_Console("here\n");
     TEST(rc, P1_SUCCESS);
     rc = P2_Wait(&waitPid, &status);
     TEST(rc, P1_SUCCESS);

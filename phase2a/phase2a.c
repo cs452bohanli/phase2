@@ -37,6 +37,10 @@ void getProcInfoStub(USLOSS_Sysargs*);
 void getPidStub(USLOSS_Sysargs*);
 void getTimeOfDayStub(USLOSS_Sysargs*);
 
+int setOsMode(int mode) {
+    assert(mode == 0 || mode == 1);
+    return USLOSS_PsrSet((USLOSS_PsrGet() & (~1)) | mode);
+}
 /*
     Returns the pid of the user process given by the kernel pid, -1 if not found.
 */
@@ -53,6 +57,7 @@ static int getUserProcess(int kernelPid) {
  */
 static int launch(void *arg)
 {
+    assert(setOsMode(0) == USLOSS_DEV_OK);
     int currentUserProcess = getUserProcess(P1_GetPid());
     assert(currentUserProcess != -1);
     int status = processes[currentUserProcess].startFunc(processes[currentUserProcess].startArg);
@@ -191,9 +196,6 @@ int
 P2_Wait(int *pid, int *status) 
 {
     checkIfIsKernel();
-    USLOSS_Console("inside %d\n", P1_GetPid());
-    int currentUserProcess = getUserProcess(P1_GetPid());
-    assert(currentUserProcess != -1);
     int rc = P1_Join(TAG_USER, pid, status);
     if (rc != P1_SUCCESS) return rc;
 
