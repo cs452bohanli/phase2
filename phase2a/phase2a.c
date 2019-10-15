@@ -12,7 +12,47 @@
 #define TAG_KERNEL 0
 #define TAG_USER 1
 
+#define UNINITIALIZED 0
+#define INITIALIZED 1
+#define TERMINATED 2
+
+
+
+typedef struct up {
+    int kernelPid, state;
+    int (*startFunc)(void *);
+    void *startArg;
+    int isOrphan;
+} UserProcess;
+
+static UserProcess processes[P1_MAXPROC];
+
+void checkIfIsKernel();
+
 static void SpawnStub(USLOSS_Sysargs *sysargs);
+
+/*
+    Returns the pid of the user process given by the kernel pid, -1 if not found.
+*/
+static int getUserProcess(int kernelPid) {
+    int i;
+    for (i = 0; i < P1_MAXPROC; i++) {
+        if (processes[i].state != UNINITIALIZED && processes[i].kernelPid == kernelPid) return i;
+    }
+    return -1;
+}
+
+/*
+ * Helper function to call func passed to P1_Fork with its arg.
+ */
+static int launch(void *arg)
+{
+    int currentUserProcess = getUserProcess(P1_GetPid());
+    assert(currentUserProcess != -1);
+    int status = processes[currentUserProcess].startFunc(processes[currentUserProcess].startArg);
+    P2_Terminate(status);
+    return status;
+}
 
 /*
  * IllegalHandler
@@ -61,7 +101,12 @@ SyscallHandler(int type, void *arg)
 void
 P2ProcInit(void) 
 {
-    int rc;
+    checkIfIsKernel();
+    int rc, i;
+
+    for (i = 0; i < P1_MAXPROC; i++) {
+        processes[i].state = FALSE;
+    }
 
     USLOSS_IntVec[USLOSS_ILLEGAL_INT] = IllegalHandler;
     USLOSS_IntVec[USLOSS_SYSCALL_INT] = SyscallHandler;
@@ -81,7 +126,7 @@ P2ProcInit(void)
 int
 P2_SetSyscallHandler(unsigned int number, void (*handler)(USLOSS_Sysargs *args))
 {
-
+    checkIfIsKernel();
     return P1_SUCCESS;
 }
 
@@ -94,7 +139,23 @@ P2_SetSyscallHandler(unsigned int number, void (*handler)(USLOSS_Sysargs *args))
 int 
 P2_Spawn(char *name, int(*func)(void *arg), void *arg, int stackSize, int priority, int *pid) 
 {
-    return P1_SUCCESS;
+    checkIfIsKernel();
+    int rc, i;
+    for (i = 0; i < P1_MAXPROC; i++) {
+        if (processes[i].state == UNINITIALIZED) {
+            processes[i].state = INITIALIZED;
+            processes[i].startFunc = func;
+            processes[i].startArg = arg;
+            processes[i].isOrphan = FALSE;
+            break;
+        }
+    }
+    if (i == P1_MAXPROC) return P1_TOO_MANY_PROCESSES;
+    *pid = i;
+    rc = P1_Fork(name, launch, arg, stackSize, priority, TAG_USER, &(processes[i].kernelPid));
+    if (rc != P1_SUCCESS) processes[i].state = UNINITIALIZED;
+    
+    return rc;
 }
 
 /*
@@ -107,6 +168,16 @@ P2_Spawn(char *name, int(*func)(void *arg), void *arg, int stackSize, int priori
 int 
 P2_Wait(int *pid, int *status) 
 {
+    checkIfIsKernel();
+    int currentUserProcess = getUserProcess(P1_GetPid());
+    assert(currentUserProcess != -1);
+    int rc = P1_Join(TAG_USER, pid, status);
+    if (rc != P1_SUCCESS) return rc;
+
+    *pid = getUserProcess(*pid);
+    assert(*pid != -1);
+    assert(processes[*pid].state == TERMINATED);
+    processes[*pid].state = UNINITIALIZED;
     return P1_SUCCESS;
 }
 
@@ -120,7 +191,22 @@ P2_Wait(int *pid, int *status)
 void 
 P2_Terminate(int status) 
 {
-
+    checkIfIsKernel();
+    int currentUserProcess = getUserProcess(P1_GetPid());
+    assert(currentUserProcess != -1);
+    processes[currentUserProcess].state = processes[currentUserProcess].isOrphan ? UNINITIALIZED : TERMINATED;
+    // set all children to orphans
+    P1_ProcInfo info;
+    int rc = P1_GetProcInfo(P1_GetPid(), &info);
+    assert(rc == P1_SUCCESS);
+    int i;
+    for (i = 0; i < info.numChildren; i++) {
+        int userChild = getUserProcess(info.children[i]);
+        if (userChild != -1) {
+            processes[userChild].isOrphan = TRUE;
+            if (processes[userChild].state == TERMINATED) processes[userChild].state = UNINITIALIZED;
+        }
+    }
 }
 
 /*
@@ -133,6 +219,7 @@ P2_Terminate(int status)
 static void 
 SpawnStub(USLOSS_Sysargs *sysargs) 
 {
+    checkIfIsKernel();
     int (*func)(void *) = sysargs->arg1;
     void *arg = sysargs->arg2;
     int stackSize = (int) sysargs->arg3;
@@ -146,7 +233,16 @@ SpawnStub(USLOSS_Sysargs *sysargs)
     sysargs->arg4 = (void *) rc;
 }
 
-
+/*
+ * Checks psr to make sure OS is in kernel mode, halting USLOSS if not. Mode bit
+ * is the LSB.
+ */
+void checkIfIsKernel(){ 
+    if ((USLOSS_PsrGet() & 1) != 1) {
+        USLOSS_Console("The OS must be in kernel mode!");
+        USLOSS_IllegalInstruction();
+    }
+}
 
 
 
