@@ -28,8 +28,11 @@ typedef struct up {
 static UserProcess processes[P1_MAXPROC];
 
 void checkIfIsKernel();
+int isValidSys(int number);
 
 static void SpawnStub(USLOSS_Sysargs *sysargs);
+void waitStub(USLOSS_Sysargs *sysargs);
+void terminateStub(USLOSS_Sysargs *sysargs);
 
 /*
     Returns the pid of the user process given by the kernel pid, -1 if not found.
@@ -87,7 +90,10 @@ IllegalHandler(int type, void *arg)
 static void 
 SyscallHandler(int type, void *arg) 
 {
-    USLOSS_Console("%d\n", type);
+    USLOSS_Sysargs args = (USLOSS_Sysargs *) args;
+    // not sure if right way to handle errors
+    if (!isValidSys(args -> number)) USLOSS_IllegalInstruction();
+    handlers[args -> number](args);
 }
 
 
@@ -114,6 +120,10 @@ P2ProcInit(void)
     // call P2_SetSyscallHandler to set handlers for all system calls
     rc = P2_SetSyscallHandler(SYS_SPAWN, SpawnStub);
     assert(rc == P1_SUCCESS);
+    rc = P2_SetSyscallHandler(SYS_WAIT, waitStub);
+    assert(rc == P1_SUCCESS);
+    rc = P2_SetSyscallHandler(SYS_TERMINATE, terminateStub);
+    assert(rc == P1_SUCCESS);
 }
 
 /*
@@ -127,8 +137,7 @@ int
 P2_SetSyscallHandler(unsigned int number, void (*handler)(USLOSS_Sysargs *args))
 {
     checkIfIsKernel();
-    if (number > USLOSS_MAX_SYSCALLS) return P2_INVALID_SYSCALL;
-    if (!(number >= 3 && number <= 5) && !(number >= 20 && number <= 22)) return P2_INVALID_SYSCALL;
+    if (!isValidSys(number)) return P2_INVALID_SYSCALL;
     
     handlers[number] = handler;
     return P1_SUCCESS;
@@ -237,6 +246,28 @@ SpawnStub(USLOSS_Sysargs *sysargs)
     sysargs->arg4 = (void *) rc;
 }
 
+void waitStub(USLOSS_Sysargs *sysargs) {
+    checkIfIsKernel();
+    int pid = 0, status = 0, rc;
+    rc = P2_Wait(&pid, &status);
+    sysargs -> arg1 = (void*) pid;
+    sysargs -> arg2 = (void*) status;
+    sysargs -> arg4 = (void*) rc;
+}
+
+void terminateStub(USLOSS_Sysargs *sysargs) {
+    checkIfIsKernel();
+    P2_Terminate((int) sysargs -> arg1);
+}
+
+/*
+    Checks to see if a sys number is valid.
+*/
+void isValidSys(unsigned int number) {
+    if (number > USLOSS_MAX_SYSCALLS) return FALSE;
+    if (!(number >= 3 && number <= 5) && !(number >= 20 && number <= 22)) return FALSE;
+    return TRUE;
+}
 /*
  * Checks psr to make sure OS is in kernel mode, halting USLOSS if not. Mode bit
  * is the LSB.
