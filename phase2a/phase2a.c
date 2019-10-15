@@ -178,10 +178,10 @@ P2_Spawn(char *name, int(*func)(void *arg), void *arg, int stackSize, int priori
         }
     }
     if (i == P1_MAXPROC) return P1_TOO_MANY_PROCESSES;
-    *pid = i;
+    
     rc = P1_Fork(name, launch, arg, stackSize, priority, TAG_USER, &(processes[i].kernelPid));
     if (rc != P1_SUCCESS) processes[i].state = UNINITIALIZED;
-    
+    *pid = processes[i].kernelPid;
     return rc;
 }
 
@@ -308,7 +308,7 @@ int isValidSys(unsigned int number) {
  */
 void checkIfIsKernel(){ 
     if ((USLOSS_PsrGet() & 1) != 1) {
-        USLOSS_Console("The OS must be in kernel mode!");
+        USLOSS_Console("The OS must be in kernel mode!\n");
         USLOSS_IllegalInstruction();
     }
 }

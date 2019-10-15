@@ -69,6 +69,7 @@ int Child(void *arg) {
     int pid;
 
     Sys_GetPID(&pid);
+	
     TEST(pid, childPid);
     CheckName("Child", childPid);
     CheckName("P2_Startup", p2Pid);
