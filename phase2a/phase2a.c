@@ -28,7 +28,7 @@ typedef struct up {
 static UserProcess processes[P1_MAXPROC];
 
 void checkIfIsKernel();
-int isValidSys(int number);
+int isValidSys(unsigned int number);
 
 static void SpawnStub(USLOSS_Sysargs *sysargs);
 void waitStub(USLOSS_Sysargs *sysargs);
