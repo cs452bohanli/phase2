@@ -16,7 +16,7 @@
 #define INITIALIZED 1
 #define TERMINATED 2
 
-
+void (*handlers[USLOSS_MAX_SYSCALLS])(USLOSS_Sysargs *args);
 
 typedef struct up {
     int kernelPid, state;
@@ -87,7 +87,7 @@ IllegalHandler(int type, void *arg)
 static void 
 SyscallHandler(int type, void *arg) 
 {
-
+    USLOSS_Console("%d\n", type);
 }
 
 
@@ -127,6 +127,10 @@ int
 P2_SetSyscallHandler(unsigned int number, void (*handler)(USLOSS_Sysargs *args))
 {
     checkIfIsKernel();
+    if (number > USLOSS_MAX_SYSCALLS) return P2_INVALID_SYSCALL;
+    if (!(number >= 3 && number <= 5) && !(number >= 20 && number <= 22)) return P2_INVALID_SYSCALL;
+    
+    handlers[number] = handler;
     return P1_SUCCESS;
 }
 
@@ -232,6 +236,8 @@ SpawnStub(USLOSS_Sysargs *sysargs)
     }
     sysargs->arg4 = (void *) rc;
 }
+
+static void 
 
 /*
  * Checks psr to make sure OS is in kernel mode, halting USLOSS if not. Mode bit
