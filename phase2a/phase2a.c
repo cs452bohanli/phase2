@@ -263,7 +263,7 @@ void terminateStub(USLOSS_Sysargs *sysargs) {
 /*
     Checks to see if a sys number is valid.
 */
-void isValidSys(unsigned int number) {
+int isValidSys(unsigned int number) {
     if (number > USLOSS_MAX_SYSCALLS) return FALSE;
     if (!(number >= 3 && number <= 5) && !(number >= 20 && number <= 22)) return FALSE;
     return TRUE;
