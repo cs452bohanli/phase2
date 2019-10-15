@@ -237,8 +237,6 @@ SpawnStub(USLOSS_Sysargs *sysargs)
     sysargs->arg4 = (void *) rc;
 }
 
-static void 
-
 /*
  * Checks psr to make sure OS is in kernel mode, halting USLOSS if not. Mode bit
  * is the LSB.
