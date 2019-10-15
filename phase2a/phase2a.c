@@ -278,17 +278,17 @@ void getProcInfoStub(USLOSS_Sysargs *sysargs) {
 	int pid = sysargs->arg1;
 	P1_ProcInfo *info = sysargs->arg2;
 	rc = P1_GetProcInfo(pid, info);
-    sysargs->arg4 = (void*) rc;
+	sysargs->arg4 = (void*) rc;
 }
 
 void getPidStub(USLOSS_Sysargs *sysargs) {
-    checkIfIsKernel();
+	checkIfIsKernel();
 	int pid = P1_GetPID();
 	sysargs->arg1 = (void*) pid;
 }
 
 void getTimeOfDayStub(USLOSS_Sysargs *sysargs){
-    checkIfIsKernel();
+	checkIfIsKernel();
 	int rc = USLOSS_Clock;
 	sysargs->arg1 = (void*) rc;
 }
