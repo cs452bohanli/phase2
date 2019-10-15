@@ -273,15 +273,24 @@ void terminateStub(USLOSS_Sysargs *sysargs) {
 }
 
 void getProcInfoStub(USLOSS_Sysargs *sysargs) {
-    USLOSS_Console("procinfo not implemented\n");
+	checkIfIsKernel();
+	int rc;
+	int pid = sysargs->arg1;
+	P1_ProcInfo *info = sysargs->arg2;
+	rc = P1_GetProcInfo(pid, info);
+    sysargs->arg4 = (void*) rc;
 }
 
 void getPidStub(USLOSS_Sysargs *sysargs) {
-    USLOSS_Console("getpid not implemented\n");
+    checkIfIsKernel();
+	int pid = P1_GetPID();
+	sysargs->arg1 = (void*) pid;
 }
 
 void getTimeOfDayStub(USLOSS_Sysargs *sysargs){
-    USLOSS_Console("gettimeofday not implemented\n");
+    checkIfIsKernel();
+	int rc = USLOSS_Clock;
+	sysargs->arg1 = (void*) rc;
 }
 
 /*
