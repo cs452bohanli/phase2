@@ -68,16 +68,11 @@ int P2_Startup(void *arg)
 int Child(void *arg) {
     int pid;
 
-	USLOSS_Console("in child\n");
     Sys_GetPID(&pid);
-	USLOSS_Console("between\n");
     TEST(pid, childPid);
-	USLOSS_Console("after test\n");
     CheckName("Child", childPid);
-	USLOSS_Console("check child\n");
     CheckName("P2_Startup", p2Pid);
     CheckName("P3_Startup", p3Pid);
-	USLOSS_Console("after all checks\n");
     return (int) arg;
 }
 
@@ -93,19 +88,17 @@ int P3_Startup(void *arg) {
     int start, finish;
 
     Sys_GetTimeOfDay(&start);
-
     rc = Sys_Spawn("Child", Child, (void *) 42, USLOSS_MIN_STACK, 3, &childPid);
     TEST(rc, P1_SUCCESS);
 
-	USLOSS_Console("before startup wait\n");
     rc = Sys_Wait(&waitPid, &status);
-	USLOSS_Console("after startup wait\n");
     TEST(rc, P1_SUCCESS);
     TEST(status, 42);
     TEST(waitPid, childPid);
     Sys_GetTimeOfDay(&finish);
     TEST(finish > start, 1);
     Sys_Terminate(11);
+	assert(0);
     // does not get here
     return 0;
 }

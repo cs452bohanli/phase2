@@ -23,6 +23,7 @@ typedef struct up {
     int (*startFunc)(void *);
     void *startArg;
     int isOrphan;
+	int status;
 } UserProcess;
 
 static UserProcess processes[P1_MAXPROC];
@@ -57,12 +58,12 @@ static int getUserProcess(int kernelPid) {
  */
 static int launch(void *arg)
 {
-    assert(setOsMode(0) == USLOSS_DEV_OK);
     int currentUserProcess = getUserProcess(P1_GetPid());
     assert(currentUserProcess != -1);
+	assert(setOsMode(0) == USLOSS_DEV_OK);
+
     int status = processes[currentUserProcess].startFunc(processes[currentUserProcess].startArg);
-    assert(setOsMode(1) == USLOSS_DEV_OK);
-	P2_Terminate(status);
+	Sys_Terminate(status);
     return status;
 }
 
@@ -101,7 +102,10 @@ SyscallHandler(int type, void *arg)
 {
     USLOSS_Sysargs *args = (USLOSS_Sysargs *) arg;
     // not sure if right way to handle errors
-    if (!isValidSys(args -> number)) USLOSS_IllegalInstruction();
+    if (!isValidSys(args -> number)) {
+		USLOSS_Console("probably shouldn't be here\n");
+		USLOSS_IllegalInstruction();
+	}
     handlers[args -> number](args);
 }
 
@@ -197,16 +201,15 @@ int
 P2_Wait(int *pid, int *status) 
 {
     checkIfIsKernel();
-	USLOSS_Console("inside wait\n");
 
     int rc = P1_Join(TAG_USER, pid, status);
-	USLOSS_Console("there\n");
-
+	
     if (rc != P1_SUCCESS) return rc;
 
     int userPid = getUserProcess(*pid);
     assert(userPid != -1);
     assert(processes[userPid].state == TERMINATED);
+	*status = processes[userPid].status;
     processes[userPid].state = UNINITIALIZED;
     return P1_SUCCESS;
 }
@@ -224,6 +227,7 @@ P2_Terminate(int status)
     checkIfIsKernel();
     int currentUserProcess = getUserProcess(P1_GetPid());
     assert(currentUserProcess != -1);
+	processes[currentUserProcess].status = status;
     processes[currentUserProcess].state = processes[currentUserProcess].isOrphan ? UNINITIALIZED : TERMINATED;
     // set all children to orphans
     P1_ProcInfo info;
@@ -237,6 +241,7 @@ P2_Terminate(int status)
             if (processes[userChild].state == TERMINATED) processes[userChild].state = UNINITIALIZED;
         }
     }
+	P1_Quit(status);
 }
 
 /*
