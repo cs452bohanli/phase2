@@ -27,6 +27,8 @@ typedef struct up {
 } UserProcess;
 
 static UserProcess processes[P1_MAXPROC];
+// semaphores
+static int mutex;
 
 void checkIfIsKernel();
 int isValidSys(unsigned int number);
@@ -47,10 +49,14 @@ int setOsMode(int mode) {
 */
 static int getUserProcess(int kernelPid) {
     int i;
+	int retval = -1;
     for (i = 0; i < P1_MAXPROC; i++) {
-        if (processes[i].state != UNINITIALIZED && processes[i].kernelPid == kernelPid) return i;
+        if (processes[i].state != UNINITIALIZED && processes[i].kernelPid == kernelPid) {
+			retval = i;
+			break;
+		}
     }
-    return -1;
+    return retval;
 }
 
 /*
@@ -58,11 +64,15 @@ static int getUserProcess(int kernelPid) {
  */
 static int launch(void *arg)
 {
+	P1_P(mutex);
     int currentUserProcess = getUserProcess(P1_GetPid());
-    assert(currentUserProcess != -1);
+	assert(currentUserProcess != -1);
+	int (*startFunc)(void *) = processes[currentUserProcess].startFunc;
+    void *startArg = processes[currentUserProcess].startArg;
+	P1_V(mutex);
 	assert(setOsMode(0) == USLOSS_DEV_OK);
 
-    int status = processes[currentUserProcess].startFunc(processes[currentUserProcess].startArg);
+    int status = startFunc(startArg);
 	Sys_Terminate(status);
     return status;
 }
@@ -121,12 +131,13 @@ void
 P2ProcInit(void) 
 {
     checkIfIsKernel();
+	P1_SemCreate("mutex", 1, &mutex);
     int rc, i;
 
     for (i = 0; i < P1_MAXPROC; i++) {
         processes[i].state = FALSE;
     }
-
+	
     USLOSS_IntVec[USLOSS_ILLEGAL_INT] = IllegalHandler;
     USLOSS_IntVec[USLOSS_SYSCALL_INT] = SyscallHandler;
 
@@ -172,6 +183,7 @@ int
 P2_Spawn(char *name, int(*func)(void *arg), void *arg, int stackSize, int priority, int *pid) 
 {
     checkIfIsKernel();
+	assert(P1_P(mutex) == P1_SUCCESS);
     int rc, i;
     for (i = 0; i < P1_MAXPROC; i++) {
         if (processes[i].state == UNINITIALIZED) {
@@ -183,10 +195,12 @@ P2_Spawn(char *name, int(*func)(void *arg), void *arg, int stackSize, int priori
         }
     }
     if (i == P1_MAXPROC) return P1_TOO_MANY_PROCESSES;
-    
+    assert(P1_V(mutex) == P1_SUCCESS);
     rc = P1_Fork(name, launch, arg, stackSize, priority, TAG_USER, &(processes[i].kernelPid));
-    if (rc != P1_SUCCESS) processes[i].state = UNINITIALIZED;
+    P1_P(mutex);
+	if (rc != P1_SUCCESS) processes[i].state = UNINITIALIZED;
     *pid = processes[i].kernelPid;
+	P1_V(mutex);
     return rc;
 }
 
@@ -206,11 +220,13 @@ P2_Wait(int *pid, int *status)
 	
     if (rc != P1_SUCCESS) return rc;
 
+	P1_P(mutex);
     int userPid = getUserProcess(*pid);
     assert(userPid != -1);
     assert(processes[userPid].state == TERMINATED);
 	*status = processes[userPid].status;
     processes[userPid].state = UNINITIALIZED;
+	P1_V(mutex);
     return P1_SUCCESS;
 }
 
@@ -225,6 +241,8 @@ void
 P2_Terminate(int status) 
 {
     checkIfIsKernel();
+	P1_P(mutex);
+
     int currentUserProcess = getUserProcess(P1_GetPid());
     assert(currentUserProcess != -1);
 	processes[currentUserProcess].status = status;
@@ -232,6 +250,7 @@ P2_Terminate(int status)
     // set all children to orphans
     P1_ProcInfo info;
     int rc = P1_GetProcInfo(P1_GetPid(), &info);
+
     assert(rc == P1_SUCCESS);
     int i;
     for (i = 0; i < info.numChildren; i++) {
@@ -239,8 +258,10 @@ P2_Terminate(int status)
         if (userChild != -1) {
             processes[userChild].isOrphan = TRUE;
             if (processes[userChild].state == TERMINATED) processes[userChild].state = UNINITIALIZED;
-        }
+		}
     }
+	P1_V(mutex);
+
 	P1_Quit(status);
 }
 
