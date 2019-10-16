@@ -61,7 +61,8 @@ static int launch(void *arg)
     int currentUserProcess = getUserProcess(P1_GetPid());
     assert(currentUserProcess != -1);
     int status = processes[currentUserProcess].startFunc(processes[currentUserProcess].startArg);
-    P2_Terminate(status);
+    assert(setOsMode(1) == USLOSS_DEV_OK);
+	P2_Terminate(status);
     return status;
 }
 
@@ -196,13 +197,17 @@ int
 P2_Wait(int *pid, int *status) 
 {
     checkIfIsKernel();
+	USLOSS_Console("inside wait\n");
+
     int rc = P1_Join(TAG_USER, pid, status);
+	USLOSS_Console("there\n");
+
     if (rc != P1_SUCCESS) return rc;
 
-    *pid = getUserProcess(*pid);
-    assert(*pid != -1);
-    assert(processes[*pid].state == TERMINATED);
-    processes[*pid].state = UNINITIALIZED;
+    int userPid = getUserProcess(*pid);
+    assert(userPid != -1);
+    assert(processes[userPid].state == TERMINATED);
+    processes[userPid].state = UNINITIALIZED;
     return P1_SUCCESS;
 }
 
