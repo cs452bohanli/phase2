@@ -131,4 +131,5 @@ void test_cleanup(int argc, char **argv) {
     if (passed) {
         USLOSS_Console("TEST PASSED.\n");
     }
+	assert(global == 450);
 }

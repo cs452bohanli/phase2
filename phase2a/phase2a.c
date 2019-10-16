@@ -289,6 +289,9 @@ SpawnStub(USLOSS_Sysargs *sysargs)
     sysargs->arg4 = (void *) rc;
 }
 
+/*
+	Stub for Sys_Wait system call.
+*/
 void waitStub(USLOSS_Sysargs *sysargs) {
     checkIfIsKernel();
     int pid = 0, status = 0, rc;
@@ -298,11 +301,17 @@ void waitStub(USLOSS_Sysargs *sysargs) {
     sysargs -> arg4 = (void*) rc;
 }
 
+/*
+	Stub for Sys_Terminate system call.
+*/
 void terminateStub(USLOSS_Sysargs *sysargs) {
     checkIfIsKernel();
     P2_Terminate((int) sysargs -> arg1);
 }
 
+/*
+	Stub for Sys_GetProcInfo system call.
+*/
 void getProcInfoStub(USLOSS_Sysargs *sysargs) {
 	checkIfIsKernel();
 	int rc;
@@ -312,12 +321,18 @@ void getProcInfoStub(USLOSS_Sysargs *sysargs) {
 	sysargs->arg4 = (void*) rc;
 }
 
+/*
+	Stub for Sys_GetPid system call;
+*/
 void getPidStub(USLOSS_Sysargs *sysargs) {
 	checkIfIsKernel();
 	int pid = P1_GetPid();
 	sysargs->arg1 = (void*) pid;
 }
 
+/*
+	Stub for Sys_GetTimeOfDay system call.
+*/
 void getTimeOfDayStub(USLOSS_Sysargs *sysargs){
 	checkIfIsKernel();
 	int status;
