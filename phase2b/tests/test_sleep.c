@@ -86,5 +86,6 @@ void test_cleanup(int argc, char **argv) {
     if (passed) {
         USLOSS_Console("TEST PASSED.\n");
     }
+    P2ClockShutdown();
 }
 
