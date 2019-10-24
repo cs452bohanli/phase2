@@ -95,6 +95,8 @@ ClockDriver(void *arg)
 		P(mutex);
 		for (int i = 0; i < P1_MAXPROC; i++) {
 			if (processes[i].isActive) {
+				int rc = USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, &now);
+				assert(rc == USLOSS_DEV_OK);
 				if (processes[i].duration * 1000000 <= now - processes[i].startTime)
 					processes[i].isAsleep = FALSE;
 			}
