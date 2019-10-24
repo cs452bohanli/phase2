@@ -99,7 +99,6 @@ ClockDriver(void *arg)
 				if (processes[i].duration*1000000 <= now - processes[i].startTime) {
 					processes[i].isAsleep = FALSE;
 				}
-				USLOSS_Console("%d %d\n", now, processes[i].startTime);
 			}
 		}
 		V(mutex);
