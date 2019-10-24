@@ -79,7 +79,6 @@ P2ClockShutdown(void)
 static int 
 ClockDriver(void *arg) 
 {
-	USLOSS_Console("inside clockDriver");
     while(1) {
         int rc;
         int now;
@@ -94,7 +93,6 @@ ClockDriver(void *arg)
         // wakeup any sleeping processes whose wakeup time has arrived
 		P(mutex);
 		for (int i = 0; i < P1_MAXPROC; i++) {
-			USLOSS_Console("here\n");
 			if (processes[i].isActive) {
 				int rc = USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, &now);
 				assert(rc == USLOSS_DEV_OK);
@@ -137,10 +135,10 @@ P2_Sleep(int seconds)
 	V(mutex);
     // wait until sleep is complete
 	while(1) {
-		USLOSS_Console("im stuck here\n");
 		if (!processes[i].isAsleep) {
 			break;
 		}
+		int rc = P1_WakeupDevice(USLOSS_CLOCK_DEV, 0, 0, FALSE);
 	}
 	P(mutex);
 	processes[i].isActive = FALSE;
