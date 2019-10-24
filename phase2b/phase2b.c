@@ -51,7 +51,7 @@ P2ClockInit(void)
 
 	int pid;
     // fork the clock driver here
-	// P1EnableInterrupts();
+	P1EnableInterrupts();
 	rc = P1_Fork("clock driver", ClockDriver, NULL, USLOSS_MIN_STACK, 2, 0, &pid);
 	assert(rc == P1_SUCCESS);
 }
@@ -79,7 +79,7 @@ P2ClockShutdown(void)
 static int 
 ClockDriver(void *arg) 
 {
-
+	USLOSS_Console("inside clockDriver");
     while(1) {
         int rc;
         int now;
