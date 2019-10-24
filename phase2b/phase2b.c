@@ -15,6 +15,7 @@ static void 	checkIfIsKernel();
 // semaphores
 int mutex;
 
+// helper functions for semaphores, makes code cleaner
 void P(int sid) {
 	assert(P1_P(sid) == P1_SUCCESS);
 }
@@ -138,6 +139,7 @@ P2_Sleep(int seconds)
 			break;
 		}
 		int rc = P1_WakeupDevice(USLOSS_CLOCK_DEV, 0, 0, FALSE);
+		assert(rc == USLOSS_DEV_OK);
 	}
 	P(mutex);
 	processes[i].isActive = FALSE;
