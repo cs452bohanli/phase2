@@ -97,8 +97,10 @@ ClockDriver(void *arg)
 			if (processes[i].isActive) {
 				int rc = USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, &now);
 				assert(rc == USLOSS_DEV_OK);
-				if (processes[i].duration * 1000000 <= now - processes[i].startTime)
+				if (processes[i].duration*1000000 <= now - processes[i].startTime) {
 					processes[i].isAsleep = FALSE;
+				}
+				USLOSS_Console("%d %d\n", now, processes[i].startTime);
 			}
 		}
 		V(mutex);
