@@ -138,6 +138,7 @@ P2_Sleep(int seconds)
     // wait until sleep is complete
 	while(1) {
 		P(mutex);
+		USLOSS_Console("im stuck here\n");
 		if (!processes[i].isAsleep) {
 			V(mutex);
 			break;
