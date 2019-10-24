@@ -94,6 +94,7 @@ ClockDriver(void *arg)
         // wakeup any sleeping processes whose wakeup time has arrived
 		P(mutex);
 		for (int i = 0; i < P1_MAXPROC; i++) {
+			USLOSS_Console("here\n");
 			if (processes[i].isActive) {
 				int rc = USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, &now);
 				assert(rc == USLOSS_DEV_OK);
