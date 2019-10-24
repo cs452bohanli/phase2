@@ -25,7 +25,7 @@ void V(int sid) {
 }
 
 typedef struct p {
-    int pid, startTime, duration, isAsleep, isActive;
+    int pid, startTime, duration, sid, isActive;
 } Process; 
 
 Process processes[P1_MAXPROC];
@@ -45,7 +45,13 @@ P2ClockInit(void)
 	rc = P1_SemCreate("mutex", 1, &mutex);
 	assert(rc == P1_SUCCESS);
     // initialize data structures here
-	for (int i = 0; i < P1_MAXPROC; i++) processes[i].isActive = FALSE;	
+	for (int i = 0; i < P1_MAXPROC; i++) {
+		char name[20];
+		sprintf(name, "%d", i);
+		rc = P1_SemCreate(name, 0, &processes[i].sid);
+		assert(rc == P1_SUCCESS);
+		processes[i].isActive = FALSE;
+	}		
 
     rc = P2_SetSyscallHandler(SYS_SLEEP, SleepStub);
     assert(rc == P1_SUCCESS);
@@ -98,7 +104,7 @@ ClockDriver(void *arg)
 				int rc = USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, &now);
 				assert(rc == USLOSS_DEV_OK);
 				if (processes[i].duration*1000000 <= now - processes[i].startTime) {
-					processes[i].isAsleep = FALSE;
+					V(processes[i].sid);
 				}
 			}
 		}
@@ -126,7 +132,6 @@ P2_Sleep(int seconds)
 	}
 	assert(i != P1_MAXPROC);
 	processes[i].isActive = TRUE;
-	processes[i].isAsleep = TRUE;
 	int now;
 	int rc = USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, &now);
 	assert(rc == USLOSS_DEV_OK);
@@ -134,13 +139,7 @@ P2_Sleep(int seconds)
 	processes[i].duration = seconds;
 	V(mutex);
     // wait until sleep is complete
-	while(1) {
-		if (!processes[i].isAsleep) {
-			break;
-		}
-		int rc = P1_WakeupDevice(USLOSS_CLOCK_DEV, 0, 0, FALSE);
-		assert(rc == USLOSS_DEV_OK);
-	}
+	P(processes[i].sid);
 	P(mutex);
 	processes[i].isActive = FALSE;
     V(mutex);
