@@ -34,6 +34,7 @@ int Sleeper(void *arg) {
     assert(rc == 0);
     Sys_GetTimeOfDay(&end);
     TEST(Slept(start, end) >= seconds, 1);
+	USLOSS_Console("%d %d %d\n", seconds, start, end);
     return 0;
 }
 
