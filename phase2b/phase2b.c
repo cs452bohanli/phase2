@@ -57,6 +57,8 @@ P2ClockInit(void)
     assert(rc == P1_SUCCESS);
 
 	int pid;
+	rc = USLOSS_PsrSet(USLOSS_PsrGet() | (1 << 1)); // set 2nd but of the psr to 1
+	assert(rc == USLOSS_DEV_OK);
     // fork the clock driver here
 	rc = P1_Fork("clock driver", ClockDriver, NULL, USLOSS_MIN_STACK, 2, 0, &pid);
 	assert(rc == P1_SUCCESS);
