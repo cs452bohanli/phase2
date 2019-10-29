@@ -3,6 +3,9 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+
+#include <phase1.h>
 
 static char *states[] = {"Free", "Run", "Ready", "Quit", "Block", "Join"};
 
@@ -48,13 +51,13 @@ ErrorCodeToString(int code)
 static void
 DumpProcesses(void)
 {
-    USLOSS_Console("%10s %3s %8s %3s %3s %4s %3s %s\n", "Name", "PID", "State", "Pri", "Tag", "CPU", "SID", "Par", "Children");
+    USLOSS_Console("%20s %3s %8s %3s %3s %8s %3s %3s %s\n", "Name", "PID", "State", "Pri", "Tag", "CPU", "SID", "Par", "Children");
     for (int i = 0; i < P1_MAXPROC; i++) {
         P1_ProcInfo info;
         memset(&info, '\0', sizeof(info));
         int rc = P1_GetProcInfo(i, &info);
         if ((rc == P1_SUCCESS) && (info.state != P1_STATE_FREE)) {
-            USLOSS_Console("%10s %3d %8s %3d %3d %4d %3d ", info.name, i, states[info.state], info.priority, info.tag, info.cpu, info.sid, info.parent);
+            USLOSS_Console("%20s %3d %8s %3d %3d %8d %3d %3d ", info.name, i, states[info.state], info.priority, info.tag, info.cpu, info.sid, info.parent);
             for (int j = 0; j < info.numChildren; j++) {
               USLOSS_Console("%d ", info.children[j]);
             }
@@ -71,7 +74,24 @@ MakeName(char *prefix, int suffix)
     return name;
 }
 
+static void
+DeleteDisk(int disk) 
+{
+    char path[30];
+    snprintf(path, sizeof(path), "disk%d", disk);
+    unlink(path);
+}
+
+static void
+DeleteAllDisks(void)
+{
+    for (int i = 0; i < USLOSS_DISK_UNITS; i++) {
+        DeleteDisk(i);
+    }
+}
+
 #define PASSED() { \
+    passed = TRUE; \
 }
 
 #define FAILED(val, expected) { \
