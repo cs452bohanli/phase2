@@ -30,6 +30,9 @@ P2DiskInit(void)
     assert(rc == P1_SUCCESS);
 
     // fork the disk drivers here
+	int pid;
+	rc = P1_Fork("disk driver", DiskDriver, NULL, USLOSS_MIN_STACK, 2, 0, &pid);
+	assert(rc == P1_SUCCESS);
 }
 
 /*
