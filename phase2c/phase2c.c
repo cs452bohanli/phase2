@@ -11,7 +11,9 @@
 
 static int      DiskDriver(void *);
 static void     DiskReadStub(USLOSS_Sysargs *sysargs);
-static void		DiskWriteStub(USLOSS_Sysargs *sysargs);
+static void	    DiskWriteStub(USLOSS_Sysargs *sysargs);
+static void     DiskSizeStub(USLOSS_Sysargs *sysargs);
+void checkIfIsKernel();
 void moveTrack(int track, int unit);
 void completeReadWriteAt(int type, int sector, int unit, void *buffer);
 
@@ -50,8 +52,8 @@ int numDisks = 0;
 void 
 P2DiskInit(void) 
 {
-    int rc;
-	
+    checkIfIsKernel(); //added
+	int rc;
     // initialize data structures here
 	int i, j, status;
 	USLOSS_DeviceRequest request;
@@ -87,10 +89,14 @@ P2DiskInit(void)
     assert(rc == P1_SUCCESS);
 	rc = P2_SetSyscallHandler(SYS_DISKWRITE, DiskWriteStub);
 	assert(rc == P1_SUCCESS);
+	rc = P2_SetSyscallHandler(SYS_DISKSIZE, DiskSizeStub); //added
+    assert(rc == P1_SUCCESS);
 
     // fork the disk drivers here
 	int pid;
 	for (i = 0; i < numDisks; i++ ) {
+		rc = USLOSS_PsrSet(USLOSS_PsrGet() | (1 << 1)); // set 2nd but of the psr to 1
+		assert(rc == USLOSS_DEV_OK); //added interrupt enable
 		rc = P1_Fork("disk driver", DiskDriver, (void*) i, USLOSS_MIN_STACK, 2, 0, &pid);
 		assert(rc == P1_SUCCESS);
 	}
@@ -106,6 +112,7 @@ int shutdown = FALSE;
 void 
 P2DiskShutdown(void) 
 {
+	checkIfIsKernel(); //added
 	shutdown = TRUE;
 	int i;
 	for (i = 0; i < numDisks; i++) {
@@ -167,6 +174,7 @@ DiskDriver(void *arg)
 int 
 P2_DiskWrite(int unit, int track, int first, int sectors, void *buffer) 
 {
+	checkIfIsKernel(); //added
 	if (unit < 0 || unit >= numDisks) return P1_INVALID_UNIT;
 	if (track < 0 || track >= NUM_TRACKS[unit]) return P2_INVALID_TRACK;
 	if (first < 0 || first >= USLOSS_DISK_TRACK_SIZE) return P2_INVALID_FIRST;
@@ -196,13 +204,14 @@ P2_DiskWrite(int unit, int track, int first, int sectors, void *buffer)
 static void 
 DiskWriteStub(USLOSS_Sysargs *sysargs) 
 {
+	checkIfIsKernel(); //added
 	void *buffer = sysargs->arg1;
 	int sectors = (int) sysargs->arg2;
 	int track = (int) sysargs->arg3;
 	int first = (int) sysargs->arg4;
 	int unit = (int) sysargs->arg5;
 	
-    // call P2_DiskRead
+    // call P2_DiskWrite
     // put result in sysargs
 	sysargs->arg4 = (void*) P2_DiskWrite(unit, track, first, sectors, buffer);
 }
@@ -216,6 +225,7 @@ DiskWriteStub(USLOSS_Sysargs *sysargs)
 int 
 P2_DiskRead(int unit, int track, int first, int sectors, void *buffer) 
 {
+	checkIfIsKernel(); //added
 	if (unit < 0 || unit >= numDisks) return P1_INVALID_UNIT;
 	if (track < 0 || track >= NUM_TRACKS[unit]) return P2_INVALID_TRACK;
 	if (first < 0 || first >= USLOSS_DISK_TRACK_SIZE) return P2_INVALID_FIRST;
@@ -245,6 +255,7 @@ P2_DiskRead(int unit, int track, int first, int sectors, void *buffer)
 static void 
 DiskReadStub(USLOSS_Sysargs *sysargs) 
 {
+	checkIfIsKernel(); //added
 	void *buffer = sysargs->arg1;
 	int sectors = (int) sysargs->arg2;
 	int track = (int) sysargs->arg3;
@@ -281,3 +292,40 @@ void completeReadWriteAt(int type, int sector, int unit, void *buffer) {
 	assert(rc == P1_SUCCESS);
 }
 
+int P2_DiskSize(int unit, int *sector, int *track, int *disk){
+	checkIfIsKernel(); //added
+	int rc = P1_SUCCESS;
+	if (unit < 0 || unit >= numDisks) return P1_INVALID_UNIT;
+	//remove the P2_NULL_ADDRESS
+	
+	
+	
+	return rc;
+}
+
+static void 
+DiskSizeStub(USLOSS_Sysargs *sysargs) 
+{
+	checkIfIsKernel(); //added
+	int rc;
+	int sector = 0, track = 0, disk = 0;
+	int unit = (int) sysargs->arg1;
+	// call P2_DiskSize
+	rc = P2_DiskSize(unit, &sector, &track, &disk);
+    // put result in sysargs
+	sysargs->arg1 = (void*) sector;
+	sysargs->arg2 = (void*) track;
+	sysargs->arg3 = (void*) disk;
+	sysargs->arg4 = (void*) rc;
+}
+
+/*
+ * Checks psr to make sure OS is in kernel mode, halting USLOSS if not. Mode bit
+ * is the LSB.
+ */
+void checkIfIsKernel(){ 
+    if ((USLOSS_PsrGet() & 1) != 1) {
+        USLOSS_Console("The OS must be in kernel mode!\n");
+        USLOSS_IllegalInstruction();
+    }
+}
