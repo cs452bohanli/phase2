@@ -7,7 +7,7 @@
 #include <phase1.h>
 
 #include "phase2Int.h"
-
+#define QUEUE_SIZE P1_MAXSEM
 
 static int      DiskDriver(void *);
 static void     DiskReadStub(USLOSS_Sysargs *sysargs);
@@ -15,6 +15,17 @@ void moveTrack(int track, int unit);
 void readValueAt(int sector, int unit, void *buffer);
 
 int NUM_TRACKS[USLOSS_DISK_UNITS];
+
+typedef struct r {
+	int type, track, first, sectors;
+	void *buffer;
+} Request;
+
+Request queue[USLOSS_DISK_UNITS][QUEUE_SIZE];
+int queueSizes[USLOSS_DISK_UNITS];
+int queueStartIndices[USLOSS_DISK_UNITS];
+// semaphores
+int requestFinished[QUEUE_SIZE];
 
 /*
  * P2DiskInit
@@ -25,14 +36,27 @@ void
 P2DiskInit(void) 
 {
     int rc;
-
+	
     // initialize data structures here
-	int i;
+	int i, status;
 	USLOSS_DeviceRequest request;
 	for (i = 0; i < USLOSS_DISK_UNITS; i++) {
 		request.opr = USLOSS_DISK_TRACKS;
 		request.reg1 = (void*) &(NUM_TRACKS[i]);
 		rc = USLOSS_DeviceOutput(USLOSS_DISK_DEV, i, &request);
+		printf("%d\n", rc);
+		assert(rc == USLOSS_DEV_OK);
+		rc = P1_WaitDevice(USLOSS_DISK_DEV, i, &status);
+		assert(rc == P1_SUCCESS);
+		queueSizes[i] = 0;
+		queueStartIndices[i] = 0;
+	}
+
+	for (i = 0; i < QUEUE_SIZE; i++) {
+		char name[10];
+		sprintf(name, "%d", i);
+		rc = P1_SemCreate("name", 0, &(requestFinished[i]));
+		assert(rc == P1_SUCCESS);
 	}
     // install system call stubs here
 
@@ -41,8 +65,10 @@ P2DiskInit(void)
 
     // fork the disk drivers here
 	int pid;
-	rc = P1_Fork("disk driver", DiskDriver, NULL, USLOSS_MIN_STACK, 2, 0, &pid);
-	assert(rc == P1_SUCCESS);
+	for (i = 0; i < USLOSS_DISK_UNITS; i++ ) {
+		rc = P1_Fork("disk driver", DiskDriver, (void*) i, USLOSS_MIN_STACK, 2, 0, &pid);
+		assert(rc == P1_SUCCESS);
+	}
 }
 
 int shutdown = FALSE;
@@ -67,6 +93,7 @@ P2DiskShutdown(void)
 static int 
 DiskDriver(void *arg) 
 {
+	//int driverNum = (int) arg;
 	//int rc;
     while (!shutdown) {// repeat
     	//   wait for next request
