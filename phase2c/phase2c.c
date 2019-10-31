@@ -7,25 +7,40 @@
 #include <phase1.h>
 
 #include "phase2Int.h"
-#define QUEUE_SIZE P1_MAXSEM
+#define QUEUE_SIZE (P1_MAXSEM/3)
 
 static int      DiskDriver(void *);
 static void     DiskReadStub(USLOSS_Sysargs *sysargs);
+static void		DiskWriteStub(USLOSS_Sysargs *sysargs);
 void moveTrack(int track, int unit);
-void readValueAt(int sector, int unit, void *buffer);
+void completeReadWriteAt(int type, int sector, int unit, void *buffer);
 
 int NUM_TRACKS[USLOSS_DISK_UNITS];
 
 typedef struct r {
-	int type, track, first, sectors;
+	int type, track, first, sectors, succeeded;
 	void *buffer;
 } Request;
 
 Request queue[USLOSS_DISK_UNITS][QUEUE_SIZE];
-int queueSizes[USLOSS_DISK_UNITS];
-int queueStartIndices[USLOSS_DISK_UNITS];
+int queueStarts[USLOSS_DISK_UNITS];
+int queueEnds[USLOSS_DISK_UNITS];
+
 // semaphores
-int requestFinished[QUEUE_SIZE];
+int requestFinished[USLOSS_DISK_UNITS][QUEUE_SIZE];
+int requestSent[USLOSS_DISK_UNITS];
+int mutex[USLOSS_DISK_UNITS];
+
+// helper functions for semaphores, makes code cleaner
+void P(int sid) {
+	assert(P1_P(sid) == P1_SUCCESS);
+}
+
+void V(int sid) {
+	assert(P1_V(sid) == P1_SUCCESS);
+}
+
+int numDisks = 0;
 
 /*
  * P2DiskInit
@@ -38,34 +53,44 @@ P2DiskInit(void)
     int rc;
 	
     // initialize data structures here
-	int i, status;
+	int i, j, status;
 	USLOSS_DeviceRequest request;
+	char name[10];
 	for (i = 0; i < USLOSS_DISK_UNITS; i++) {
 		request.opr = USLOSS_DISK_TRACKS;
 		request.reg1 = (void*) &(NUM_TRACKS[i]);
-		rc = USLOSS_DeviceOutput(USLOSS_DISK_DEV, i, &request);
-		printf("%d\n", rc);
-		assert(rc == USLOSS_DEV_OK);
+		rc = USLOSS_DeviceOutput(USLOSS_DISK_DEV, i, &request);		
+		if (rc == USLOSS_DEV_OK) numDisks++;
+		else break;
+
 		rc = P1_WaitDevice(USLOSS_DISK_DEV, i, &status);
 		assert(rc == P1_SUCCESS);
-		queueSizes[i] = 0;
-		queueStartIndices[i] = 0;
+
+		queueStarts[i] = 0;
+		queueEnds[i] = 0;
+		sprintf(name, "%d.", i);
+		rc = P1_SemCreate(name, 0, &(requestSent[i]));
+		assert(rc == P1_SUCCESS);
+		sprintf(name, ".%d", i);
+		rc = P1_SemCreate(name, 1, &(mutex[i]));
+		assert(rc == P1_SUCCESS);
+		for (j = 0; j < QUEUE_SIZE; j++) {
+			sprintf(name, "%d", j);
+			rc = P1_SemCreate(name, 0, &(requestFinished[i][j]));
+			assert(rc == P1_SUCCESS);
+		}
 	}
 
-	for (i = 0; i < QUEUE_SIZE; i++) {
-		char name[10];
-		sprintf(name, "%d", i);
-		rc = P1_SemCreate("name", 0, &(requestFinished[i]));
-		assert(rc == P1_SUCCESS);
-	}
     // install system call stubs here
 
     rc = P2_SetSyscallHandler(SYS_DISKREAD, DiskReadStub);
     assert(rc == P1_SUCCESS);
+	rc = P2_SetSyscallHandler(SYS_DISKWRITE, DiskWriteStub);
+	assert(rc == P1_SUCCESS);
 
     // fork the disk drivers here
 	int pid;
-	for (i = 0; i < USLOSS_DISK_UNITS; i++ ) {
+	for (i = 0; i < numDisks; i++ ) {
 		rc = P1_Fork("disk driver", DiskDriver, (void*) i, USLOSS_MIN_STACK, 2, 0, &pid);
 		assert(rc == P1_SUCCESS);
 	}
@@ -82,6 +107,10 @@ void
 P2DiskShutdown(void) 
 {
 	shutdown = TRUE;
+	int i;
+	for (i = 0; i < numDisks; i++) {
+		V(requestSent[i]);
+	}
 }
 
 /*
@@ -93,11 +122,33 @@ P2DiskShutdown(void)
 static int 
 DiskDriver(void *arg) 
 {
-	//int driverNum = (int) arg;
-	//int rc;
+	int driverNum = (int) arg;
     while (!shutdown) {// repeat
     	//   wait for next request
+		P(requestSent[driverNum]);
+		if (shutdown) break;	
+		Request request = queue[driverNum][queueStarts[driverNum]];
+	 	
+		int currentTrack = request.track;
+		moveTrack(request.track, driverNum);
+		int i, index = request.first;
+		queue[driverNum][queueStarts[driverNum]].succeeded = TRUE;
+		for (i = 0; i < request.sectors; i++) {	
+			if (index == USLOSS_DISK_TRACK_SIZE) {
+				if ((++currentTrack) >= NUM_TRACKS[driverNum]) {
+					queue[driverNum][queueStarts[driverNum]].succeeded = FALSE;	
+					break;
+				}
+				moveTrack(currentTrack, driverNum);
+				index = 0;
+			}
+			completeReadWriteAt(request.type, index, driverNum, request.buffer + i*USLOSS_DISK_SECTOR_SIZE);
+			index++;
+		}
 		
+		V(requestFinished[driverNum][queueStarts[driverNum]]);
+		queueStarts[driverNum] = (queueStarts[driverNum] + 1) % QUEUE_SIZE;
+
     	//   while request isn't complete
     	//          send appropriate operation to disk (USLOSS_DeviceOutput)
     	//          wait for operation to finish (P1_WaitDevice)
@@ -109,6 +160,55 @@ DiskDriver(void *arg)
 }
 
 /*
+ * P2_DiskWrite
+ *
+ * Writes the specified number of sectors from the disk starting at the specified track and sector.
+ */
+int 
+P2_DiskWrite(int unit, int track, int first, int sectors, void *buffer) 
+{
+	if (unit < 0 || unit >= numDisks) return P1_INVALID_UNIT;
+	if (track < 0 || track >= NUM_TRACKS[unit]) return P2_INVALID_TRACK;
+	if (first < 0 || first >= USLOSS_DISK_TRACK_SIZE) return P2_INVALID_FIRST;
+	if (buffer == NULL) return P2_NULL_ADDRESS;
+	
+    // give request to the proper device driver
+	P(mutex[unit]);
+	int requestIndex = queueEnds[unit];
+	queue[unit][requestIndex].type = USLOSS_DISK_WRITE;
+	queue[unit][requestIndex].track = track;
+	queue[unit][requestIndex].first = first;
+	queue[unit][requestIndex].sectors = sectors;
+	queue[unit][requestIndex].buffer = buffer;
+	queueEnds[unit] = (queueEnds[unit] + 1) % QUEUE_SIZE;
+	V(mutex[unit]);
+	V(requestSent[unit]);
+	// wait until device driver completes the request
+	P(requestFinished[unit][requestIndex]);
+    return queue[unit][requestIndex].succeeded ? P1_SUCCESS : P2_INVALID_SECTORS;
+}
+
+/*
+ * DiskWriteStub
+ *
+ * Stub for the Sys_DiskRead system call.
+ */
+static void 
+DiskWriteStub(USLOSS_Sysargs *sysargs) 
+{
+	void *buffer = sysargs->arg1;
+	int sectors = (int) sysargs->arg2;
+	int track = (int) sysargs->arg3;
+	int first = (int) sysargs->arg4;
+	int unit = (int) sysargs->arg5;
+	
+    // call P2_DiskRead
+    // put result in sysargs
+	sysargs->arg4 = (void*) P2_DiskWrite(unit, track, first, sectors, buffer);
+}
+
+
+/*
  * P2_DiskRead
  *
  * Reads the specified number of sectors from the disk starting at the specified track and sector.
@@ -116,26 +216,25 @@ DiskDriver(void *arg)
 int 
 P2_DiskRead(int unit, int track, int first, int sectors, void *buffer) 
 {
-	if (unit < 0 || unit >= USLOSS_DISK_UNITS) return P1_INVALID_UNIT;
+	if (unit < 0 || unit >= numDisks) return P1_INVALID_UNIT;
 	if (track < 0 || track >= NUM_TRACKS[unit]) return P2_INVALID_TRACK;
 	if (first < 0 || first >= USLOSS_DISK_TRACK_SIZE) return P2_INVALID_FIRST;
 	if (buffer == NULL) return P2_NULL_ADDRESS;
 	
-	int currentTrack = track;
-	moveTrack(track, unit);
-	int i, index = first;
-	for (i = 0; i < sectors; i++) {
-		if (index == USLOSS_DISK_TRACK_SIZE) {
-			if ((++currentTrack) >= NUM_TRACKS[unit]) return P2_INVALID_SECTORS;
-			moveTrack(currentTrack, unit);
-			index = 0;
-		}
-		readValueAt(index, unit, buffer + i*USLOSS_DISK_SECTOR_SIZE);
-		index++;
-	}
     // give request to the proper device driver
-    // wait until device driver completes the request
-    return P1_SUCCESS;
+	P(mutex[unit]);
+	int requestIndex = queueEnds[unit];
+	queue[unit][requestIndex].type = USLOSS_DISK_READ;
+	queue[unit][requestIndex].track = track;
+	queue[unit][requestIndex].first = first;
+	queue[unit][requestIndex].sectors = sectors;
+	queue[unit][requestIndex].buffer = buffer;
+	queueEnds[unit] = (queueEnds[unit] + 1) % QUEUE_SIZE;
+	V(mutex[unit]);
+	V(requestSent[unit]);
+	// wait until device driver completes the request
+	P(requestFinished[unit][requestIndex]);
+    return queue[unit][requestIndex].succeeded ? P1_SUCCESS : P2_INVALID_SECTORS;
 }
 
 /*
@@ -164,15 +263,21 @@ void moveTrack(int track, int unit) {
 	request.reg1 = (void*) track;
 	rc = USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, &request);
 	assert(rc == USLOSS_DEV_OK);
+	int status;
+	rc = P1_WaitDevice(USLOSS_DISK_DEV, unit, &status);
+	assert(rc == P1_SUCCESS);
 }
 
-void readValueAt(int sector, int unit, void *buffer) {
+void completeReadWriteAt(int type, int sector, int unit, void *buffer) {
 	int rc;
 	USLOSS_DeviceRequest request;
-	request.opr = USLOSS_DISK_READ;
+	request.opr = type;
 	request.reg1 = (void*) sector;
 	request.reg2 = buffer;
 	rc = USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, &request);
 	assert(rc == USLOSS_DEV_OK);
+	int status;
+	rc = P1_WaitDevice(USLOSS_DISK_DEV, unit, &status);
+	assert(rc == P1_SUCCESS);
 }
 

@@ -27,7 +27,8 @@ int P3_Startup(void *arg) {
     USLOSS_Console("Write to the disk.\n");
     int rc = Sys_DiskWrite(buffer, 0, 0, 1, 0);
     USLOSS_Console("Verify that the disk write was successful.\n");
-    assert(rc == P1_SUCCESS);
+    USLOSS_Console("%d\n", rc);
+	assert(rc == P1_SUCCESS);
     USLOSS_Console("Wrote \"%s\".\n", buffer);
 
     bzero(buffer, sizeof(buffer));
