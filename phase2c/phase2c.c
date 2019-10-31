@@ -267,6 +267,7 @@ DiskReadStub(USLOSS_Sysargs *sysargs)
 	sysargs->arg4 = (void*) P2_DiskRead(unit, track, first, sectors, buffer);
 }
 
+// helper function handling moving the disk track synchronously
 void moveTrack(int track, int unit) {
 	int rc;
 	USLOSS_DeviceRequest request;
@@ -279,6 +280,7 @@ void moveTrack(int track, int unit) {
 	assert(rc == P1_SUCCESS);
 }
 
+// helper function handling read and write synchronously 
 void completeReadWriteAt(int type, int sector, int unit, void *buffer) {
 	int rc;
 	USLOSS_DeviceRequest request;
@@ -292,6 +294,7 @@ void completeReadWriteAt(int type, int sector, int unit, void *buffer) {
 	assert(rc == P1_SUCCESS);
 }
 
+// returns disk size information in sector, track, and disk
 int P2_DiskSize(int unit, int *sector, int *track, int *disk){
 	checkIfIsKernel(); //added
 	int rc = P1_SUCCESS;
@@ -304,6 +307,7 @@ int P2_DiskSize(int unit, int *sector, int *track, int *disk){
 	return rc;
 }
 
+// stub for disk size
 static void 
 DiskSizeStub(USLOSS_Sysargs *sysargs) 
 {
