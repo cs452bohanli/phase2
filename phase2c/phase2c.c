@@ -296,9 +296,10 @@ int P2_DiskSize(int unit, int *sector, int *track, int *disk){
 	checkIfIsKernel(); //added
 	int rc = P1_SUCCESS;
 	if (unit < 0 || unit >= numDisks) return P1_INVALID_UNIT;
-	//remove the P2_NULL_ADDRESS
-	
-	
+	if (sector == NULL || track == NULL || disk == NULL) return P2_NULL_ADDRESS;
+	*sector = USLOSS_DISK_SECTOR_SIZE;
+	*track = USLOSS_DISK_TRACK_SIZE;
+	*disk = NUM_TRACKS[unit];
 	
 	return rc;
 }
