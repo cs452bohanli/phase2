@@ -91,6 +91,7 @@ extern int              P1_SemCreate(char *name, unsigned int value, int *sid) C
 extern  int             P1_SemFree(int sid) CHECKRETURN;
 extern  int             P1_P(int sid) CHECKRETURN;
 extern  int             P1_V(int sid) CHECKRETURN;
+extern  int             P1_SemName(int sid, char *name) CHECKRETURN; 
 
 extern  int             P1_WaitDevice(int type, int unit, int *status) CHECKRETURN;
 extern int              P1_WakeupDevice(int type, int unit, int status, int abort) CHECKRETURN;

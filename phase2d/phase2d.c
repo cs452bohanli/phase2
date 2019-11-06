@@ -10,6 +10,10 @@
 #include "phase2Int.h"
 
 static void     CreateStub(USLOSS_Sysargs *sysargs);
+static void     PStub(USLOSS_Sysargs *sysargs);
+static void     VStub(USLOSS_Sysargs *sysargs);
+static void     FreeStub(USLOSS_Sysargs *sysargs);
+static void     NameStub(USLOSS_Sysargs *sysargs);
 
 /*
  * I left this useful function here for you to use for debugging. If you add -DDEBUG to CFLAGS
@@ -34,8 +38,19 @@ int P2_Startup(void *arg)
     // initialize clock and disk drivers
 
     debug2("starting\n");
+	
+	// configure syscalls
     rc = P2_SetSyscallHandler(SYS_SEMCREATE, CreateStub);
     assert(rc == P1_SUCCESS);
+    rc = P2_SetSyscallHandler(SYS_SEMP, PStub);
+    assert(rc == P1_SUCCESS);
+    rc = P2_SetSyscallHandler(SYS_SEMV, VStub);
+    assert(rc == P1_SUCCESS);
+    rc = P2_SetSyscallHandler(SYS_SEMFREE, FreeStub);
+    assert(rc == P1_SUCCESS);
+    rc = P2_SetSyscallHandler(SYS_SEMNAME, NameStub);
+    assert(rc == P1_SUCCESS);
+
     // ...
     rc = P2_Spawn("P3_Startup", P3_Startup, NULL, 4*USLOSS_MIN_STACK, 3, &pid);
     assert(rc == P1_SUCCESS);
@@ -53,3 +68,18 @@ CreateStub(USLOSS_Sysargs *sysargs)
                                           (void *) &sysargs->arg1);
 }
 
+static void PStub(USLOSS_Sysargs *sysargs) {
+	sysargs->arg4 = (void*) P1_P((int) sysargs->arg1);
+}
+
+static void VStub(USLOSS_Sysargs *sysargs) {
+	sysargs->arg4 = (void*) P1_V((int) sysargs->arg1);
+}
+
+static void FreeStub(USLOSS_Sysargs *sysargs) {
+	sysargs->arg4 = (void*) P1_SemFree((int) sysargs->arg1);
+}
+
+static void NameStub(USLOSS_Sysargs *sysargs) {
+	sysargs->arg4 = (void*) P1_SemName((int) sysargs->arg1, (char*) sysargs->arg2);
+}
