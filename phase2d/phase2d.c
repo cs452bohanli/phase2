@@ -36,7 +36,8 @@ int P2_Startup(void *arg)
     int rc, pid;
 
     // initialize clock and disk drivers
-
+	P2ClockInit();
+	P2DiskInit();
     debug2("starting\n");
 	
 	// configure syscalls
@@ -57,7 +58,8 @@ int P2_Startup(void *arg)
     // ...
 
     // shut down clock and disk drivers
-
+	P2DiskShutdown();
+	P2ClockShutdown();
     return 0;
 }
 

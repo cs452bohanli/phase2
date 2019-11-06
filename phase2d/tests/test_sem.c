@@ -31,7 +31,7 @@ Sleeper(void *arg)
     int rc;
 
     USLOSS_Console("Sleeping.\n");
-    rc = Sys_Sleep(10);
+    rc = Sys_Sleep(1);
     assert(rc == P1_SUCCESS);
 
     flag = 1;
@@ -58,7 +58,7 @@ Waiter(void *arg)
     TEST(rc, P1_SUCCESS);
     // make sure we actually waited for Sleeper.
     TEST(flag, 1);
-    return 0;
+	return 0;
 }
 
 #define MSG "This is a test!"
@@ -78,15 +78,17 @@ Writer(void *arg)
     int tracks;
     char *buffer;
 
+	USLOSS_Console("before writer disksize\n");
     rc = Sys_DiskSize(0, &bytesPerSector, &sectorsPerTrack, &tracks);
     assert(rc == P1_SUCCESS);
+	USLOSS_Console("after writer disksize\n");
     buffer = malloc(bytesPerSector);
     strncpy(buffer, MSG, bytesPerSector);
 
     USLOSS_Console("Writing disk.\n");
     rc = Sys_DiskWrite(buffer, 0, 0, 1, 0);
     assert(rc == P1_SUCCESS);
-    
+       
     rc = Sys_SemV(sid);
     TEST(rc, P1_SUCCESS);
     return 0;
@@ -105,9 +107,11 @@ Reader(void *arg)
     int sectorsPerTrack;
     int tracks;
     char *buffer;
-
+	
+	USLOSS_Console("before disksize\n");
     rc = Sys_DiskSize(0, &bytesPerSector, &sectorsPerTrack, &tracks);
     assert(rc == P1_SUCCESS);
+	USLOSS_Console("after disksize\n");
 
     rc = Sys_SemP(sid);
     TEST(rc, P1_SUCCESS);
