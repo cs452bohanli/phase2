@@ -55,6 +55,9 @@ int P2_Startup(void *arg)
     // ...
     rc = P2_Spawn("P3_Startup", P3_Startup, NULL, 4*USLOSS_MIN_STACK, 3, &pid);
     assert(rc == P1_SUCCESS);
+	int status;
+	rc = P2_Wait(&pid, &status);
+	assert(rc == P1_SUCCESS); 
     // ...
 
     // shut down clock and disk drivers
