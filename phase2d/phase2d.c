@@ -59,6 +59,7 @@ int P2_Startup(void *arg)
     return 0;
 }
 
+// stub for create semaphore
 static void
 CreateStub(USLOSS_Sysargs *sysargs)
 {
@@ -66,18 +67,22 @@ CreateStub(USLOSS_Sysargs *sysargs)
                                           (void *) &sysargs->arg1);
 }
 
+// stub for P semaphore
 static void PStub(USLOSS_Sysargs *sysargs) {
 	sysargs->arg4 = (void*) P1_P((int) sysargs->arg1);
 }
 
+// stub for V semaphore
 static void VStub(USLOSS_Sysargs *sysargs) {
 	sysargs->arg4 = (void*) P1_V((int) sysargs->arg1);
 }
 
+// stub for free semaphore
 static void FreeStub(USLOSS_Sysargs *sysargs) {
 	sysargs->arg4 = (void*) P1_SemFree((int) sysargs->arg1);
 }
 
+// stub for name of semaphore
 static void NameStub(USLOSS_Sysargs *sysargs) {
 	sysargs->arg4 = (void*) P1_SemName((int) sysargs->arg1, (char*) sysargs->arg2);
 }
